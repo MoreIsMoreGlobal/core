@@ -22,10 +22,14 @@
 namespace OC\Group;
 
 use OC\Group\BackendGroup;
+use OC\User\Account;
 use OCP\AppFramework\Db\Mapper;
 use OCP\AppFramework\Db\Entity;
 use OCP\IConfig;
 use OCP\IDBConnection;
+use OCP\AppFramework\Db\DoesNotExistException;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use OCP\DB\QueryBuilder\IQueryBuilder;
 
 class GroupMapper extends Mapper {
 
@@ -34,25 +38,27 @@ class GroupMapper extends Mapper {
 	}
 
 	/**
-	 * @param BackendGroup $entity
-	 * @return Entity the saved entity with the set id
-	 */
-	public function insert(Entity $entity) {
-		// run the normal entity insert operation to get an id
-		return parent::insert($entity);
-	}
-
-	/**
+	 * Return backend group object or null in case does not exists
+	 *
 	 * @param string $uid
-	 * @return BackendGroup
+	 * @return BackendGroup|null
 	 */
-	public function getGroup($gid) {
+	public function getByGid($gid) {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select('*')
 			->from($this->getTableName())
 			->where($qb->expr()->eq('group_id', $qb->createNamedParameter($gid)));
 
-		return $this->findEntity($qb->getSQL(), $qb->getParameters());
+		try {
+			/** @var BackendGroup $backendGroup */
+			$backendGroup = $this->findEntity($qb->getSQL(), $qb->getParameters());
+			if (is_null($backendGroup)) {
+				return null;
+			}
+			return $backendGroup;
+		} catch (DoesNotExistException $ex) {
+			return null;
+		}
 	}
 
 	/**
